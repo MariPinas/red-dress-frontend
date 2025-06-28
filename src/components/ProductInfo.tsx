@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { getProductQuantity, removeProduct } from "../api/productApi";
+import {
+  addProduct,
+  getProductQuantity,
+  removeProduct,
+} from "../api/productApi";
 import { subscribe, unsubscribe } from "../api/notificationApi";
 import vestidoImg from "../assets/vestidoVermelho.jpg";
 
@@ -11,7 +15,6 @@ export default function ProductInfo() {
   const [buyQuantity, setBuyQuantity] = useState(1);
   const [email, setEmail] = useState("");
 
-  // Estados separados para diferentes tipos de notificação
   const [stockNotification, setStockNotification] = useState<string | null>(
     null
   );
@@ -22,6 +25,29 @@ export default function ProductInfo() {
   const [isBuying, setIsBuying] = useState(false);
   const [wsStatus, setWsStatus] = useState("Conectando...");
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [adminQuantity, setAdminQuantity] = useState(10);
+  const [isAdminOperating, setIsAdminOperating] = useState(false);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    if (operationStatus) {
+      timer = setTimeout(() => {
+        setOperationStatus(null);
+      }, 5000);
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [operationStatus]);
+
+  useEffect(() => {
+    if (stockNotification) {
+      const timer = setTimeout(() => setStockNotification(null), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [stockNotification]);
 
   useEffect(() => {
     async function fetchQuantity() {
@@ -56,14 +82,8 @@ export default function ProductInfo() {
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "STOCK_UPDATE") {
-        // Atualiza o estoque com o valor recebido do servidor
         setQuantity(data.quantity);
-
-        // Mostra a notificação específica de estoque
         setStockNotification(data.message);
-
-        // Remove após 10 segundos
-        setTimeout(() => setStockNotification(null), 10000);
       }
     };
 
@@ -142,8 +162,8 @@ export default function ProductInfo() {
     setIsBuying(true);
     setOperationStatus(null);
     try {
-      await removeProduct(productName, buyQuantity);
-      setQuantity((prev) => (prev !== null ? prev - buyQuantity : null));
+      const newQuantity = await removeProduct(productName, buyQuantity);
+      setQuantity(newQuantity);
       setOperationStatus("Compra realizada com sucesso!");
     } catch (error) {
       setOperationStatus("Erro ao realizar compra. Tente novamente." + error);
@@ -152,11 +172,48 @@ export default function ProductInfo() {
     }
   }
 
+  async function handleAdminAddStock() {
+    if (!adminQuantity || adminQuantity <= 0) {
+      setOperationStatus("Informe uma quantidade válida");
+      return;
+    }
+
+    setIsAdminOperating(true);
+    setOperationStatus(null);
+    try {
+      const newQuantity = await addProduct(productName, adminQuantity);
+      setQuantity(newQuantity);
+      setOperationStatus(`${adminQuantity} unidades adicionadas ao estoque!`);
+    } catch (error) {
+      setOperationStatus("Erro ao adicionar estoque: " + error);
+    } finally {
+      setIsAdminOperating(false);
+    }
+  }
+
+  async function handleAdminRemoveStock() {
+    if (!adminQuantity || adminQuantity <= 0) {
+      setOperationStatus("Informe uma quantidade válida");
+      return;
+    }
+
+    setIsAdminOperating(true);
+    setOperationStatus(null);
+    try {
+      const newQuantity = await removeProduct(productName, adminQuantity);
+      setQuantity(newQuantity);
+      setOperationStatus(`${adminQuantity} unidades removidas do estoque!`);
+    } catch (error) {
+      setOperationStatus("Erro ao remover estoque: " + error);
+    } finally {
+      setIsAdminOperating(false);
+    }
+  }
+
   return (
     <div style={styles.container}>
       <div style={styles.statusBar}>Conexão: {wsStatus}</div>
 
-      {/* Notificação de atualização de estoque */}
       {stockNotification && (
         <div style={styles.stockNotification}>{stockNotification}</div>
       )}
@@ -190,7 +247,6 @@ export default function ProductInfo() {
         </div>
       )}
 
-      {/* Mensagens de operação (inscrição/compra) */}
       {operationStatus && <p style={styles.notification}>{operationStatus}</p>}
 
       {quantity !== null && quantity === 0 && (
@@ -247,6 +303,31 @@ export default function ProductInfo() {
           </button>
         </div>
       )}
+      <div style={{ marginTop: 20, marginBottom: 20 }}>
+        <h3 style={{ color: "#e9e9e9" }}>Controle de Estoque (Admin)</h3>
+        <input
+          type="number"
+          min={1}
+          value={adminQuantity}
+          onChange={(e) => setAdminQuantity(Number(e.target.value))}
+          style={styles.input}
+          disabled={isAdminOperating}
+        />
+        <button
+          onClick={handleAdminAddStock}
+          disabled={isAdminOperating}
+          style={{ ...styles.button, backgroundColor: "#4CAF50" }}
+        >
+          {isAdminOperating ? "Adicionando..." : "Adicionar ao Estoque"}
+        </button>
+        <button
+          onClick={handleAdminRemoveStock}
+          disabled={isAdminOperating}
+          style={{ ...styles.button, backgroundColor: "#f44336" }}
+        >
+          {isAdminOperating ? "Removendo..." : "Remover do Estoque"}
+        </button>
+      </div>
     </div>
   );
 }

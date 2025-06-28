@@ -8,18 +8,26 @@ export async function getProductQuantity(name: string) {
   return quantidade;
 }
 
-export async function addProduct(name: string, quantity: number) {
+export async function addProduct(
+  name: string,
+  quantity: number
+): Promise<number> {
   const response = await api.post("/product/add", {
     name,
     quantity,
   });
-  return response.data;
+
+  return response.data.product.quantity;
 }
 
-export async function removeProduct(name: string, quantity: number) {
+export async function removeProduct(
+  name: string,
+  quantity: number
+): Promise<number> {
   const response = await api.post("/product/remove", {
     name,
     quantity,
   });
-  return response.data;
+
+  return response.data.product.quantity;
 }
