@@ -4,7 +4,8 @@ export async function getProductQuantity(name: string) {
   const response = await api.get("/product/quantity", {
     params: { name },
   });
-  return response.data;
+  const quantidade = response.data.quantity?.[0]?.quantity;
+  return quantidade;
 }
 
 export async function addProduct(name: string, quantity: number) {
